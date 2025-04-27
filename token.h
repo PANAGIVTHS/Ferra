@@ -9,6 +9,11 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+typedef struct parsetT {
+    Token** tokens;
+    int current;
+    int tokenCount;
+} Parser;
 
 typedef enum {
     TOKEN_EOF,
