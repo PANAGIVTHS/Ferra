@@ -1,0 +1,3 @@
+/home/panagivths/Documents/GitHub/Ferra/cmake-build-debug/CMakeFiles/Ferra.dir
+/home/panagivths/Documents/GitHub/Ferra/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/panagivths/Documents/GitHub/Ferra/cmake-build-debug/CMakeFiles/rebuild_cache.dir

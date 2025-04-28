@@ -2,72 +2,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h> // Fixes implicit declaration of strlen & strncmp
-#define TEST_LEXER
+#include "lexer.h"
+#include "utils.h"
 
-
-#ifndef LEXER_H
-#define LEXER_H
-#define KEYWORD_COUNT (sizeof(keywords) / sizeof(Keyword))
-
-// * General Use
-#define allocError(ptr, func) \
-    do { \
-        if ((ptr) == NULL) { \
-            fprintf(stderr, "Malloc - Allocation Error in %s\n", func); \
-            return(NULL); \
-        } \
-    } while (0)
-
-
-#define peek() (source[lexer.currentOffset])
-#define advance() (source[lexer.currentOffset++])
-
-// * Keywords
-typedef enum {
-    TOKEN_EOF,
-    TOKEN_INT_LITERAL,
-    TOKEN_FLOAT_LITERAL,
-    TOKEN_IDENTIFIER,
-
-    // types
-    TOKEN_TYPE_INT,
-    TOKEN_TYPE_BOOL,
-    TOKEN_TYPE_FLOAT,
-
-    TOKEN_KEYWORD_LET,
-    TOKEN_KEYWORD_FUN,
-    TOKEN_KEYWORD_RETURN,
-    TOKEN_KEYWORD_IF,
-    TOKEN_KEYWORD_ELSE,
-    TOKEN_KEYWORD_WHILE,
-    TOKEN_KEYWORD_MATCH,
-
-    TOKEN_ARROW,         // ->
-    TOKEN_MATCH_ARROW,   // =>
-    TOKEN_EQUAL,         // =
-    TOKEN_PLUS,          // +
-    TOKEN_MINUS,         // -
-    TOKEN_STAR,          // *
-    TOKEN_SLASH,         // /
-    TOKEN_PIPE,          // |
-
-    TOKEN_LPAREN,        // (
-    TOKEN_RPAREN,        // )
-    TOKEN_LBRACE,        // {
-    TOKEN_RBRACE,        // }
-    TOKEN_MATCH_WILDCARD,// _
-
-    TOKEN_COMMA,         // ,
-    TOKEN_SEMICOLON,     // ;
-    TOKEN_COLON,         // :
-
-    TOKEN_UNKNOWN
-} TokenType;
-
-typedef struct keyword {
-    const char* word;
-    TokenType type;
-} Keyword;
+const char *source = NULL;
+LexerInfo     lexer  = {0};
 
 static const Keyword keywords[] = {
     { "let", TOKEN_KEYWORD_LET },
@@ -82,22 +21,6 @@ static const Keyword keywords[] = {
     { "float", TOKEN_TYPE_FLOAT },
     { "_", TOKEN_MATCH_WILDCARD }
 };
-
-struct lexerInfo {
-    int startOffset;
-    int currentOffset;
-    int line;
-};
-
-struct lexerInfo lexer;
-const char *source;
-
-typedef struct {
-    const char *start;
-    TokenType type;
-    int length;
-    int line;
-} Token;
 
 void init_lexer (const char* initSource) {
     source = initSource;
@@ -121,10 +44,11 @@ void skip_whitespace() {
         switch (c) {
             case '\n':
                 lexer.line++;
+                // fall through
             case '\r':
             case '\t':
             case ' ':
-                advance();
+                (void) advance();
                 break;
             default:
                 return;
@@ -132,20 +56,18 @@ void skip_whitespace() {
     }
 }
 
-// Initialises a new token
-Token *tokenizer (TokenType type) {
-    Token *newToken;
-    
-    newToken = (Token*) malloc(sizeof(Token));
-    allocError(newToken, "tokenizer");
-    
+Token *tokenizer(const TokenType type) {
+    Token *newToken = allocToken();
+
+    // Populate the token's fields
     newToken->type = type;
     newToken->line = lexer.line;
-    newToken->start = source + lexer.startOffset;  // Fixed to ensure it's a pointer to the string
+    newToken->start = source + lexer.startOffset;
     newToken->length = lexer.currentOffset - lexer.startOffset;
 
-    return(newToken);
+    return newToken;
 }
+
 
 Token *identifierOrKeyword () {
     char current;
@@ -155,17 +77,17 @@ Token *identifierOrKeyword () {
     while (1) {
         current = peek();
         if (!is_end() && (isalpha(current) || isdigit(current) || current == '_'))
-            advance();
+            (void) advance();
         else
-            break; 
+            break;
     }
-    
+
     len = lexer.currentOffset - lexer.startOffset;
 
     type = TOKEN_IDENTIFIER;
 
-    for (int i = 0; i < KEYWORD_COUNT; i++) {
-        if (len == strlen(keywords[i].word) && !strncmp(&source[lexer.startOffset], keywords[i].word, len)) {
+    for (int i = 0; i < (int) KEYWORD_COUNT; i++) {
+        if (len == (int) strlen(keywords[i].word) && !strncmp(&source[lexer.startOffset], keywords[i].word, len)) {
             type = keywords[i].type;
             break;
         }
@@ -179,17 +101,17 @@ Token *number () {
     char cur = peek();
 
     if (isdigit(cur)) {
-        while (isdigit(peek())) advance();
+        while (isdigit(peek())) (void) advance();
         if (peek() == '.') {
             isFloat = 1;
-            advance();
-            while (isdigit(peek())) advance();
+            (void) advance();
+            while (isdigit(peek())) (void) advance();
         }
     }
     else if (cur == '.' && isdigit(source[lexer.currentOffset + 1])) {
         isFloat = 1;
-        advance();
-        while (isdigit(peek())) advance();
+        (void) advance();
+        while (isdigit(peek())) (void) advance();
     }
     else {
         return tokenizer(TOKEN_UNKNOWN);
@@ -198,55 +120,62 @@ Token *number () {
     return tokenizer(isFloat ? TOKEN_FLOAT_LITERAL : TOKEN_INT_LITERAL);
 }
 
-Token *consume () {
+Token *lexToken() {
     char cur;
 
     skip_whitespace();
     lexer.startOffset = lexer.currentOffset;
     cur = peek();
 
+    Token *newToken = NULL;
+
     if (isalpha(cur) || cur == '_') {
-        return identifierOrKeyword(); // handles `let`, `x`, etc.
+        newToken = identifierOrKeyword();  // handles identifiers and keywords
     } else if (isdigit(cur) || cur == '.') {
-        return number(); // handles numeric literals
+        newToken = number();  // handles numeric literals
+    } else {
+        switch (cur) {
+            case '=': {
+                (void) advance();
+                if (peek() == '>') {
+                    (void) advance();
+                    newToken = tokenizer(TOKEN_MATCH_ARROW);
+                } else {
+                    newToken = tokenizer(TOKEN_EQUAL);
+                }
+                break;
+            }
+            case '-': {
+                (void) advance();
+                if (peek() == '>') {
+                    (void) advance();
+                    newToken = tokenizer(TOKEN_ARROW);
+                } else {
+                    newToken = tokenizer(TOKEN_MINUS);
+                }
+                break;
+            }
+            case '+': (void) advance(); newToken = tokenizer(TOKEN_PLUS); break;
+            case '*': (void) advance(); newToken = tokenizer(TOKEN_STAR); break;
+            case '/': (void) advance(); newToken = tokenizer(TOKEN_SLASH); break;
+            case '|': (void) advance(); newToken = tokenizer(TOKEN_PIPE); break;
+            case '(': (void) advance(); newToken = tokenizer(TOKEN_LPAREN); break;
+            case ')': (void) advance(); newToken = tokenizer(TOKEN_RPAREN); break;
+            case '{': (void) advance(); newToken = tokenizer(TOKEN_LBRACE); break;
+            case '}': (void) advance(); newToken = tokenizer(TOKEN_RBRACE); break;
+            case ',': (void) advance(); newToken = tokenizer(TOKEN_COMMA); break;
+            case ';': (void) advance(); newToken = tokenizer(TOKEN_SEMICOLON); break;
+            case ':': (void) advance(); newToken = tokenizer(TOKEN_COLON); break;
+            case '\0': newToken = tokenizer(TOKEN_EOF); break;
+            default:  // Unknown token (unrecognized character)
+                (void) advance();
+                newToken = tokenizer(TOKEN_UNKNOWN);
+        }
     }
 
-    switch (cur) {
-        case '=': {
-            advance();
-            if (peek() == '>') {
-                advance();
-                return tokenizer(TOKEN_MATCH_ARROW);
-            }
-            return tokenizer(TOKEN_EQUAL);   
-        }
-        case '-': {
-            advance();
-            if (peek() == '>') {
-                advance();
-                return tokenizer(TOKEN_ARROW);
-            }
-            return tokenizer(TOKEN_MINUS);
-        }
-        case '+': advance(); return tokenizer(TOKEN_PLUS);
-        case '*': advance(); return tokenizer(TOKEN_STAR);
-        case '/': advance(); return tokenizer(TOKEN_SLASH);
-        case '|': advance(); return tokenizer(TOKEN_PIPE);
-        case '(': advance(); return tokenizer(TOKEN_LPAREN);
-        case ')': advance(); return tokenizer(TOKEN_RPAREN);
-        case '{': advance(); return tokenizer(TOKEN_LBRACE);
-        case '}': advance(); return tokenizer(TOKEN_RBRACE);
-        case ',': advance(); return tokenizer(TOKEN_COMMA);
-        case ';': advance(); return tokenizer(TOKEN_SEMICOLON);
-        case ':': advance(); return tokenizer(TOKEN_COLON);
-        case '\0': 
-            return tokenizer(TOKEN_EOF);
-    }
-
-    // Unknown token (unrecognized character)
-    advance();
-    return tokenizer(TOKEN_UNKNOWN);
+    return newToken;
 }
+
 
 #ifdef TEST_LEXER
 const char* tokenTypeToString(TokenType type) {
@@ -270,6 +199,7 @@ const char* tokenTypeToString(TokenType type) {
         case TOKEN_STAR: return "STAR";
         case TOKEN_SLASH: return "SLASH";
         case TOKEN_PIPE: return "PIPE";
+        case TOKEN_PERCENT: return "TOKEN_PERCENT";
         case TOKEN_LPAREN: return "LPAREN";
         case TOKEN_RPAREN: return "RPAREN";
         case TOKEN_LBRACE: return "LBRACE";
@@ -326,7 +256,7 @@ int main() {
     init_lexer(sourceCode);
 
     Token *token;
-    while ((token = consume())->type != TOKEN_EOF) {
+    while ((token = lexToken())->type != TOKEN_EOF) {
         printf("Token: Type=%s, Line=%d, Length=%d, Text=`%.*s`\n",
             tokenTypeToString(token->type),
             token->line,
@@ -338,8 +268,5 @@ int main() {
 
     return 0;
 }
-
-
-#endif
 
 #endif

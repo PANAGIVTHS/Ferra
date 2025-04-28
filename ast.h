@@ -1,21 +1,15 @@
-#include "token.h"
-
 #ifndef AST_H
 #define AST_H
 
-#define allocError(ptr, func) \
-    do { \
-        if ((ptr) == NULL) { \
-            fprintf(stderr, "Malloc - Allocation Error in %s\n", func); \
-            return(NULL); \
-        } \
-    } while (0)
-
+#include <stdlib.h>
+#include <string.h>
+#include "token.h"
 
 typedef enum {
     NODE_LITERAL_INT,
     NODE_LITERAL_FLOAT,
     NODE_IDENTIFIER,
+    NODE_GROUPING,
     NODE_BINARY_EXPR,
     NODE_VAR_DECL,
     NODE_FUNCTION_DECL,
@@ -25,26 +19,39 @@ typedef enum {
     NODE_BLOCK
 } NodeType;
 
-typedef struct ASTNode {
-    NodeType type;
-    int line;
-} ASTNode;
+typedef struct ASTNode ASTNode;
 
 typedef struct {
-    ASTNode base;
+    ASTNode *left;
+    ASTNode *right;
+    Token *operator;
+} ASTBinaryExpr;
+
+typedef struct {
     int value;
 } ASTLiteralInt;
 
 typedef struct {
-    ASTNode base;
-    Token *operator;
-    ASTNode *left;
-    ASTNode *right;
-} ASTBinaryExpr;
+    char *name;
+} ASTIdentifier;
 
+typedef struct {
+    ASTNode *expression;
+} ASTGrouping;
 
-ASTBinaryExpr *allocBinaryExpr (ASTNode *left, Token *operator, ASTNode *right, int line);
-ASTLiteralInt *allocLiteralInt(int value, int line);
+struct ASTNode {
+    NodeType type;
+    int line;
+    union {
+        ASTBinaryExpr binary;
+        ASTLiteralInt literal;
+        ASTIdentifier identifier;
+        ASTGrouping grouping;
+    } as;
+};
 
+typedef void (*InitFn)(ASTNode *node, void *data);
 
-#endif
+ASTNode *allocASTNode(NodeType type, int line, void *data);
+
+#endif // AST_H
