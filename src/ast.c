@@ -1,7 +1,6 @@
 
-#include "ast.h"
-
-#include "utils.h"
+#include "headers/ast.h"
+#include "headers/utils.h"
 
 void initBinary(ASTNode *node, void *data) {
     ASTBinaryExpr *init = (ASTBinaryExpr *)data;

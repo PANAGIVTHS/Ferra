@@ -3,9 +3,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "ast.h"
-#include "lexer.h"
-#include "utils.h"
+#include "headers/ast.h"
+#include "headers/lexer.h"
+#include "headers/utils.h"
 
 #define TEST_PARSER
 

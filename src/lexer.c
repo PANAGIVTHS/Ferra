@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h> // Fixes implicit declaration of strlen & strncmp
-#include "lexer.h"
-#include "utils.h"
+#include "headers/lexer.h"
+#include "headers/utils.h"
 
 const char *source = NULL;
 LexerInfo     lexer  = {0};

@@ -1,18 +1,23 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -g
 
-SRC = lexer.c parser.c ast.c
-OBJ = $(SRC:.c=.o)
+SRC_DIR = src
+OUT_DIR = .out
 
-EXEC = mycompiler
+SRC = $(wildcard $(SRC_DIR)/*.c)
+OBJ = $(patsubst $(SRC_DIR)/%.c, $(OUT_DIR)/%.o, $(SRC))
+
+EXEC = $(OUT_DIR)/mycompiler
 
 all: $(EXEC)
 
 $(EXEC): $(OBJ)
+	mkdir -p $(OUT_DIR)
 	$(CC) $(CFLAGS) -o $@ $^
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $<
+$(OUT_DIR)/%.o: $(SRC_DIR)/%.c
+	mkdir -p $(OUT_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f *.o $(EXEC)
+	rm -rf $(OUT_DIR)
