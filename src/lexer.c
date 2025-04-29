@@ -6,7 +6,7 @@
 #include "headers/utils.h"
 
 const char *source = NULL;
-LexerInfo     lexer  = {0};
+LexerInfo lexer  = {0};
 
 static const Keyword keywords[] = {
     { "let", TOKEN_KEYWORD_LET },
@@ -67,7 +67,6 @@ Token *tokenizer(const TokenType type) {
 
     return newToken;
 }
-
 
 Token *identifierOrKeyword () {
     char current;
@@ -137,11 +136,19 @@ Token *lexToken() {
         switch (cur) {
             case '=': {
                 (void) advance();
-                if (peek() == '>') {
-                    (void) advance();
-                    newToken = tokenizer(TOKEN_MATCH_ARROW);
-                } else {
-                    newToken = tokenizer(TOKEN_EQUAL);
+                switch (peek()) {
+                    case '=': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_LOGICAL_EQ);
+                        break;
+                    }
+                    case '>': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_MATCH_ARROW);
+                        break;
+                    }
+                    default:
+                        newToken = tokenizer(TOKEN_EQUAL);
                 }
                 break;
             }
@@ -155,16 +162,82 @@ Token *lexToken() {
                 }
                 break;
             }
+            case '!': {
+                (void) advance();
+                if (peek() == '=') {
+                    (void) advance();
+                    newToken = tokenizer(TOKEN_LOGICAL_NE);
+                } else {
+                    newToken = tokenizer(TOKEN_UNKNOWN);
+                }
+                break;
+            }
+            case '<': {
+                (void) advance();
+                switch (peek()) {
+                    case '=': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_LOGICAL_LTE);
+                        break;
+                    }
+                    case '<': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_SHIFT_LEFT);
+                        break;
+                    }
+                    default:
+                        newToken = tokenizer(TOKEN_LOGICAL_LT);
+                }
+                break;
+            }
+            case '>': {
+                (void) advance();
+                switch (peek()) {
+                    case '=': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_LOGICAL_GTE);
+                        break;
+                    }
+                    case '>': {
+                        (void) advance();
+                        newToken = tokenizer(TOKEN_SHIFT_RIGHT);
+                        break;
+                    }
+                    default:
+                        newToken = tokenizer(TOKEN_LOGICAL_GT);
+                }
+                break;
+            }
+            case '&': {
+                (void) advance();
+                if (peek() == '&') {
+                    (void) advance();
+                    newToken = tokenizer(TOKEN_LOGICAL_AND);
+                } else {
+                    newToken = tokenizer(TOKEN_UNKNOWN);
+                }
+                break;
+            }
+            case '|': {
+                (void) advance();
+                if (peek() == '|') {
+                    (void) advance();
+                    newToken = tokenizer(TOKEN_LOGICAL_OR);
+                } else {
+                    newToken = tokenizer(TOKEN_PIPE);
+                }
+                break;
+            }
             case '+': (void) advance(); newToken = tokenizer(TOKEN_PLUS); break;
             case '*': (void) advance(); newToken = tokenizer(TOKEN_STAR); break;
             case '/': (void) advance(); newToken = tokenizer(TOKEN_SLASH); break;
-            case '|': (void) advance(); newToken = tokenizer(TOKEN_PIPE); break;
             case '(': (void) advance(); newToken = tokenizer(TOKEN_LPAREN); break;
             case ')': (void) advance(); newToken = tokenizer(TOKEN_RPAREN); break;
             case '{': (void) advance(); newToken = tokenizer(TOKEN_LBRACE); break;
             case '}': (void) advance(); newToken = tokenizer(TOKEN_RBRACE); break;
             case ',': (void) advance(); newToken = tokenizer(TOKEN_COMMA); break;
             case ';': (void) advance(); newToken = tokenizer(TOKEN_SEMICOLON); break;
+            case '%': (void) advance(); newToken = tokenizer(TOKEN_PERCENT); break;
             case ':': (void) advance(); newToken = tokenizer(TOKEN_COLON); break;
             case '\0': newToken = tokenizer(TOKEN_EOF); break;
             default:  // Unknown token (unrecognized character)
@@ -176,6 +249,12 @@ Token *lexToken() {
     return newToken;
 }
 
+void tokenizeAll() {
+    while (1) {
+        Token *token = lexToken();
+        if (token->type == TOKEN_EOF) break;
+    }
+}
 
 #ifdef TEST_LEXER
 const char* tokenTypeToString(TokenType type) {

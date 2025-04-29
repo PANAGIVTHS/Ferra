@@ -32,6 +32,10 @@ typedef struct {
 } ASTLiteralInt;
 
 typedef struct {
+    float value;
+} ASTLiteralFloat;
+
+typedef struct {
     char *name;
 } ASTIdentifier;
 
@@ -44,7 +48,8 @@ struct ASTNode {
     int line;
     union {
         ASTBinaryExpr binary;
-        ASTLiteralInt literal;
+        ASTLiteralInt literalInteger;
+        ASTLiteralFloat literalFloat;
         ASTIdentifier identifier;
         ASTGrouping grouping;
     } as;

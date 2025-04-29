@@ -11,7 +11,7 @@ void initBinary(ASTNode *node, void *data) {
 
 void initLiteral(ASTNode *node, void *data) {
     ASTLiteralInt *init = (ASTLiteralInt *)data;
-    node->as.literal.value = init->value;
+    node->as.literalInteger.value = init->value;
 }
 
 void initIdentifier(ASTNode *node, void *data) {
@@ -24,10 +24,16 @@ void initGrouping(ASTNode *node, void *data) {
     node->as.grouping.expression = init->expression;
 }
 
+void initFloat(ASTNode *node, void *data) {
+    ASTLiteralFloat *init = (ASTLiteralFloat *)data;
+    node->as.literalFloat.value = init->value;
+}
+
 static InitFn nodeInitializers[] = {
     [NODE_BINARY_EXPR] = initBinary,
     [NODE_LITERAL_INT] = initLiteral,
     [NODE_IDENTIFIER] = initIdentifier,
+    [NODE_LITERAL_FLOAT] = initFloat,
     [NODE_GROUPING] = initGrouping
 };
 

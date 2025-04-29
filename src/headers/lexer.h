@@ -8,6 +8,11 @@
 #define peek() (source[lexer.currentOffset])
 #define advance() (source[lexer.currentOffset++])
 
+typedef enum {
+    LEFT,
+    RIGHT
+} AssocType;
+
 typedef struct keyword {
     const char* word;
     TokenType type;
@@ -19,6 +24,12 @@ typedef struct {
     int line;
 } LexerInfo;
 
+typedef struct {
+    TokenType type;
+    int precedence;
+    AssocType assoc;
+} OperatorInfo;
+
 extern const char *source;
 extern LexerInfo lexer;
 
@@ -29,6 +40,7 @@ Token* tokenizer(TokenType type);
 Token* identifierOrKeyword(void);
 Token* number(void);
 Token* lexToken(void);
+void tokenizeAll(void);
 
 #ifdef TEST_LEXER
 const char* tokenTypeToString(TokenType type);
