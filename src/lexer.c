@@ -123,7 +123,7 @@ Token *lexToken() {
     char cur;
 
     skip_whitespace();
-    lexer.startOffset = lexer.currentOffset;
+    lexer.startOffset = lexer.currentOffset; // HERE
     cur = peek();
 
     Token *newToken = NULL;

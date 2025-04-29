@@ -13,28 +13,29 @@
 #define peekParser(offset) (parser.tokens[parser.current + offset])
 #define OPERATOR_COUNT (int)(sizeof(operatorTokens) / sizeof(TokenType))
 
-ASTNode *parseExpression();
+ASTNode *parseExpression(int precedence);
 
 Parser parser;
 
 OperatorInfo operatorInfoTable[] = {
-    { TOKEN_LOGICAL_OR,     1,  LEFT },  // ||
-    { TOKEN_LOGICAL_EQ,     4,  LEFT },  // ==
-    { TOKEN_LOGICAL_NE,     4,  LEFT },  // !=
-    { TOKEN_LOGICAL_LT,     5,  LEFT },  // <
-    { TOKEN_LOGICAL_LTE,    5,  LEFT },  // <=
-    { TOKEN_LOGICAL_GT,     5,  LEFT },  // >
-    { TOKEN_LOGICAL_GTE,    5,  LEFT },  // >=
-    { TOKEN_LOGICAL_AND,    2,  LEFT },  // &&
-    { TOKEN_SHIFT_LEFT,     6,  LEFT },  // <<
-    { TOKEN_SHIFT_RIGHT,    6,  LEFT },  // >>
-    { TOKEN_EQUAL,          9,  RIGHT },  // =
-    { TOKEN_PLUS,           7,  LEFT },  // +
-    { TOKEN_MINUS,          7,  LEFT },  // -
-    { TOKEN_STAR,           8,  LEFT },  // *
-    { TOKEN_SLASH,          8,  LEFT },  // /
-    { TOKEN_PIPE,           3,  LEFT },  // |
-    { TOKEN_PERCENT,        8,  LEFT },  // %
+    { TOKEN_LOGICAL_OR,     1, false, LEFT },  // ||
+    { TOKEN_LOGICAL_EQ,     4, false, LEFT },  // ==
+    { TOKEN_LOGICAL_NE,     4, false, LEFT },  // !=
+    { TOKEN_LOGICAL_LT,     5, false, LEFT },  // <
+    { TOKEN_LOGICAL_LTE,    5, false, LEFT },  // <=
+    { TOKEN_LOGICAL_GT,     5, false, LEFT },  // >
+    { TOKEN_LOGICAL_GTE,    5, false, LEFT },  // >=
+    { TOKEN_LOGICAL_AND,    2, false, LEFT },  // &&
+    { TOKEN_SHIFT_LEFT,     6, false, LEFT },  // <<
+    { TOKEN_SHIFT_RIGHT,    6, false, LEFT },  // >>
+    { TOKEN_EQUAL,          9, false, RIGHT},  // =
+    { TOKEN_PLUS,           7, true,  LEFT },  // +
+    { TOKEN_MINUS,          7, true,  LEFT },  // -
+    { TOKEN_STAR,           8, false, LEFT },  // *
+    { TOKEN_SLASH,          8, false, LEFT },  // /
+    { TOKEN_PIPE,           3, false, LEFT },  // |
+    { TOKEN_PERCENT,        8, false, LEFT },  // %
+    { TOKEN_NOT_OP,         -1,false, LEFT },  // NOT OP
 };
 
 TokenType operatorTokens[] = {
@@ -58,6 +59,8 @@ TokenType operatorTokens[] = {
 };
 
 OperatorInfo getOperatorInfo(const TokenType type) {
+    if (type >= OPERATOR_COUNT)
+            return operatorInfoTable[OPERATOR_COUNT];
     return operatorInfoTable[type];
 }
 
@@ -125,20 +128,23 @@ bool match(const TokenType expectedType) {
     if (parser.tokens[parser.current] == NULL) return false;
 
     if (parser.tokens[parser.current]->type == expectedType) {
-        advanceParser();
+        (void) advanceParser();
         return true;
     }
 
     return false;
 }
 
-
 // !Notice: This is Slower that || but more readable for now
 bool matchOperator() {
-    if (parser.current >= parser.tokenCount ||
-        parser.tokens[parser.current]->type == TOKEN_EOF) {
+    if (parser.current >= parser.tokenCount) {
+        fprintf(stderr, "parser.current exceeded parser.tokenCount\n");
         return false;
-        }
+    }
+
+    if (parser.tokens[parser.current]->type == TOKEN_EOF) {
+        return false;
+    }
 
     for (int i = 0; i < OPERATOR_COUNT; i++) {
         if (match(operatorTokens[i])) return true;
@@ -146,7 +152,6 @@ bool matchOperator() {
 
     return false;
 }
-
 
 Token *consume(TokenType expectedType, const char *errorMsg) {
     if (parser.tokens[parser.current]->type == expectedType) {
@@ -167,7 +172,24 @@ ASTNode *parsePrimary() {
     Token *token = peekParser(0);
 
     if (parser.current >= parser.tokenCount || parser.tokens[parser.current]->type == TOKEN_EOF) {
+        fprintf(stderr, "Null branch in AST Tree.");
         return NULL;
+    }
+
+    const OperatorInfo info = getOperatorInfo(token->type);
+
+    if (info.canUnary) {
+        (void) advanceParser();
+
+        ASTNode *value = parsePrimary();
+        if (!value) {
+            fprintf(stderr, "Null unary value in AST Tree.");
+            return NULL;
+        }
+
+        ASTUnaryExpr init = { .right = value, .operator = token};
+        return allocASTNode(NODE_UNARY_EXPR, token->line, &init);
+
     }
 
     if (match(TOKEN_INT_LITERAL)) {
@@ -186,7 +208,7 @@ ASTNode *parsePrimary() {
     }
 
     if (match(TOKEN_LPAREN)) {
-        ASTNode *expr = parseExpression();
+        ASTNode *expr = parseExpression(0);
         consume(TOKEN_RPAREN, "Expect ')' after expression.");
         ASTGrouping init = { .expression = expr };
         return allocASTNode(NODE_GROUPING, token->line, &init);
@@ -197,21 +219,28 @@ ASTNode *parsePrimary() {
     return NULL;
 }
 
-ASTNode *parseExpression() {
+ASTNode *parseExpression(int precedence) {
     ASTNode *left = parsePrimary();
 
-    while (matchOperator()) {
-        Token *operator = peekParser(-1);
-        ASTNode *right = parsePrimary();
+    while (true) {
+        Token *operator = peekParser(0);
 
-        if (!right) {
-            fprintf(stderr, "Expected expression after operator '%.*s'\n",
-                    operator->length, operator->start);
-            return NULL;
+        if (!operator) {
+            fprintf(stderr, "Null operator in AST Tree."); // maybe not an ERROR
+            break;
         }
 
-        ASTBinaryExpr init = {.left = left, .right = right, .operator = operator};
-        left = allocASTNode(NODE_BINARY_EXPR, operator->line, &init);
+        const OperatorInfo info = getOperatorInfo(operator->type);
+        if (info.type == TOKEN_NOT_OP || info.precedence < precedence) break;
+
+        (void) advanceParser(); // consume operator
+        const int nextPrecedence = info.assoc == LEFT
+                             ? info.precedence + 1
+                             : info.precedence;
+
+        ASTNode *right = parseExpression(nextPrecedence);
+        ASTBinaryExpr binary = { .left = left, .right = right, .operator = operator };
+        left = allocASTNode(NODE_BINARY_EXPR, operator->line, &binary);
     }
 
     return left;
@@ -237,6 +266,18 @@ void printASTInline(ASTNode *node, int depth) {
         printf("\"type\": \"LiteralInt\",\n");
         printIndent(depth + 1);
         printf("\"value\": %d\n", node->as.literalInteger.value);
+        break;
+
+    case NODE_UNARY_EXPR:
+        printIndent(depth + 1);
+        printf("\"type\": \"UnaryExpr\",\n");
+        printIndent(depth + 1);
+        printf("\"operator\": \"%.*s\",\n", node->as.unary.operator->length, node->as.unary.operator->start);
+
+        printIndent(depth + 1);
+        printf("\"right\": ");
+        printASTInline(node->as.unary.right, depth + 1);
+        printf("\n");
         break;
 
     case NODE_LITERAL_FLOAT:
@@ -299,21 +340,20 @@ void printAST(ASTNode *node, int depth) {
 }
 
 int main() {
-    const char *source = "var | 5.432763999 % ((var22 / 4) >> 1) || (2 + 3.) * 4 - .5";
+    const char *source = "+var | -5.432763999 % -((var22 / 4) >> 1) || (2 + 3.) * 4 - +.5";
 
     // Initialize lexer and parser
     init_lexer(source);
-    init_parser();  // this should reset parser.tokens = NULL, parser.tokenCount = 0, etc.
+    init_parser();
 
     // Tokenize entire input
     tokenizeAll();
 
-    // Now parse the expression
-    ASTNode *expression = parseExpression();
+    ASTNode *expression = parseExpression(0);
 
     if (expression) {
         printf("Expression parsed successfully!\nWith source string: %s\n", source);
-        printAST(expression, 0);  // You likely have this already
+        printAST(expression, 0);
     } else {
         printf("Failed to parse expression.\n");
     }

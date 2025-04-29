@@ -11,6 +11,7 @@ typedef enum {
     NODE_IDENTIFIER,
     NODE_GROUPING,
     NODE_BINARY_EXPR,
+    NODE_UNARY_EXPR,
     NODE_VAR_DECL,
     NODE_FUNCTION_DECL,
     NODE_IF_STMT,
@@ -26,6 +27,11 @@ typedef struct {
     ASTNode *right;
     Token *operator;
 } ASTBinaryExpr;
+
+typedef struct {
+    ASTNode *right;
+    Token *operator;
+} ASTUnaryExpr;
 
 typedef struct {
     int value;
@@ -48,6 +54,7 @@ struct ASTNode {
     int line;
     union {
         ASTBinaryExpr binary;
+        ASTUnaryExpr unary;
         ASTLiteralInt literalInteger;
         ASTLiteralFloat literalFloat;
         ASTIdentifier identifier;

@@ -2,6 +2,7 @@
 #define LEXER_H
 
 #include "token.h"
+#include <stdbool.h>
 
 #define KEYWORD_COUNT (sizeof(keywords) / sizeof(Keyword))
 
@@ -27,6 +28,7 @@ typedef struct {
 typedef struct {
     TokenType type;
     int precedence;
+    bool canUnary;
     AssocType assoc;
 } OperatorInfo;
 

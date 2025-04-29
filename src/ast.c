@@ -29,12 +29,19 @@ void initFloat(ASTNode *node, void *data) {
     node->as.literalFloat.value = init->value;
 }
 
+void initUnary(ASTNode *node, void *data) {
+    ASTUnaryExpr *init = (ASTUnaryExpr *)data;
+    node->as.unary.operator = init->operator;
+    node->as.unary.right = init->right;
+}
+
 static InitFn nodeInitializers[] = {
     [NODE_BINARY_EXPR] = initBinary,
     [NODE_LITERAL_INT] = initLiteral,
     [NODE_IDENTIFIER] = initIdentifier,
     [NODE_LITERAL_FLOAT] = initFloat,
-    [NODE_GROUPING] = initGrouping
+    [NODE_GROUPING] = initGrouping,
+    [NODE_UNARY_EXPR] = initUnary,
 };
 
 ASTNode *allocASTNode(NodeType type, int line, void *data) {
